@@ -29,12 +29,15 @@ stable-segmentation-service/
 │       └── adapters/
 │           ├── base.py              # BaseSegmentationAdapter (ABC)
 │           ├── mock_adapter.py      # Stub adapter — no GPU required
+│           ├── sam2_adapter.py      # SAM2 (Meta) backend
 │           └── registry.py          # Maps Backend enum → adapter class
 ├── tests/
 │   ├── conftest.py
 │   ├── test_health.py
 │   ├── test_capabilities.py
-│   └── test_segment.py
+│   ├── test_segment.py
+│   ├── test_sam2_adapter.py         # SAM2 adapter unit tests (mocked predictor)
+│   └── test_sam2_endpoint.py        # SAM2 HTTP-level tests (mocked predictor)
 ├── benchmark/
 │   ├── latency.py                   # Serial latency measurements
 │   └── throughput.py                # Concurrent RPS measurement
@@ -121,6 +124,72 @@ curl -s -X POST http://localhost:8000/api/v1/segment \
 | `point` | `points` list (x, y, label) |
 | `box`   | `box` object (x_min, y_min, x_max, y_max) |
 | `text`  | `text_prompt` string |
+
+---
+
+## SAM2 backend
+
+### Prerequisites
+
+1. **Install the SAM2 library** (not on PyPI — install from source):
+
+```bash
+pip install 'git+https://github.com/facebookresearch/sam2.git'
+```
+
+2. **Install the service with SAM2 extras** (numpy, Pillow, httpx):
+
+```bash
+pip install -e ".[sam2]"
+```
+
+3. **Download model weights** from the
+   [SAM2 releases page](https://github.com/facebookresearch/sam2/releases) and
+   place them somewhere accessible (e.g. `weights/`).
+
+### Configuration
+
+Set the following environment variables (or add them to `.env`):
+
+```bash
+SEGMENTATION_BACKEND=sam2
+SAM2_CHECKPOINT=weights/sam2_hiera_large.pt   # path to the downloaded .pt file
+SAM2_CONFIG=sam2_hiera_l.yaml                 # SAM2 YAML config name (no path prefix)
+MODEL_DEVICE=cuda                             # cpu | cuda | mps
+```
+
+Available config names and their weight files:
+
+| Config | Weights file |
+|--------|-------------|
+| `sam2_hiera_t.yaml` | `sam2_hiera_tiny.pt` |
+| `sam2_hiera_s.yaml` | `sam2_hiera_small.pt` |
+| `sam2_hiera_b+.yaml` | `sam2_hiera_base_plus.pt` |
+| `sam2_hiera_l.yaml` | `sam2_hiera_large.pt` |
+
+### Supported prompt types
+
+| `prompt_type` | Supported | Notes |
+|---------------|-----------|-------|
+| `point` | ✅ | Multiple (x, y, label) coordinates; supports `multimask_output=true` |
+| `box` | ✅ | Single axis-aligned bounding box; `multimask_output` is ignored |
+| `text` | ❌ | Not supported by SAM2 — check `/api/v1/capabilities` before sending |
+
+### Running with SAM2
+
+```bash
+# Copy and edit .env
+cp .env.example .env
+# Set SEGMENTATION_BACKEND=sam2 and the SAM2_* vars in .env
+
+uvicorn segmentation_service.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Verify the active backend:
+
+```bash
+curl http://localhost:8000/api/v1/capabilities | python -m json.tool
+```
 
 ---
 
@@ -215,5 +284,5 @@ All settings can be set via environment variables or a `.env` file.
 | `LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `SEGMENTATION_BACKEND` | `mock` | `mock` / `sam2` / `custom` |
 | `MODEL_DEVICE` | `cpu` | `cpu` / `cuda` / `mps` |
-| `SAM2_CHECKPOINT` | _(empty)_ | Path to SAM-2 `.pt` weights |
-| `SAM2_CONFIG` | _(empty)_ | SAM-2 YAML config name |
+| `SAM2_CHECKPOINT` | _(empty)_ | **Required for sam2.** Filesystem path to a SAM2 `.pt` weights file (e.g. `weights/sam2_hiera_large.pt`) |
+| `SAM2_CONFIG` | _(empty)_ | **Required for sam2.** SAM2 YAML config name without path prefix (e.g. `sam2_hiera_l.yaml`) |
