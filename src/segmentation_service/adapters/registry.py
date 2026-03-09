@@ -11,15 +11,17 @@ from functools import lru_cache
 
 from segmentation_service.adapters.base import BaseSegmentationAdapter
 from segmentation_service.adapters.mock_adapter import MockSegmentationAdapter
+from segmentation_service.adapters.sam2_adapter import SAM2SegmentationAdapter
 from segmentation_service.config import Backend, get_settings
 from segmentation_service.logging_config import LogContext, get_logger
 
 log = LogContext(get_logger(__name__))
 
-# Registry: Backend enum value -> adapter class
+# Registry: Backend enum value -> adapter class.
+# To add a third backend, create its module and add an entry here.
 _REGISTRY: dict[Backend, type[BaseSegmentationAdapter]] = {
     Backend.mock: MockSegmentationAdapter,
-    # Backend.sam2: SAM2SegmentationAdapter,   # uncomment when ready
+    Backend.sam2: SAM2SegmentationAdapter,
     # Backend.custom: CustomSegmentationAdapter,
 }
 
