@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "stable-segmentation-service"
+version = "0.1.0"
+description = "FastAPI-based segmentation inference service"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.27.0",       # AsyncClient for FastAPI test client
+    "anyio>=4.4.0",
+]
+benchmark = [
+    "httpx>=0.27.0",
+    "rich>=13.7.0",
+    "typer>=0.12.0",
+]
+
+[project.scripts]
+serve = "segmentation_service.main:start"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/segmentation_service"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v"
+
+[tool.hatch.envs.default]
+features = ["dev"]
+
+[tool.hatch.envs.default.scripts]
+serve = "uvicorn segmentation_service.main:app --reload --host 0.0.0.0 --port 8000"
+test  = "pytest"
+bench-latency    = "python benchmark/latency.py"
+bench-throughput = "python benchmark/throughput.py"
