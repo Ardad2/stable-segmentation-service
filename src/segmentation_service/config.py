@@ -25,6 +25,7 @@ class LogLevel(str, Enum):
 class Backend(str, Enum):
     mock = "mock"
     sam2 = "sam2"
+    clipseg = "clipseg"
     custom = "custom"
 
 
@@ -48,6 +49,9 @@ class Settings(BaseSettings):
     # ---- SAM-2 (ignored when backend != sam2) ----
     sam2_checkpoint: str = ""
     sam2_config: str = ""
+
+    # ---- CLIPSeg (ignored when backend != clipseg) ----
+    clipseg_model: str = "CIDAS/clipseg-rd64-refined"
 
     @field_validator("model_device")
     @classmethod
