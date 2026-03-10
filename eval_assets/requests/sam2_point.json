@@ -1,0 +1,14 @@
+{
+  "image": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAACKUlEQVR4nAXBCXbcKBAAUCgKsQi0dafbTvLmvHNa21oQSCyV/7mF/3He/pTZpt3m7D17Z1bRfCJzKwLtbxwGlxbORc4f1QK+b2GIy3gqcz98P0DSClisSpd3HYaOPteu6INp5c3qCEHcWg9ZX6rErrAfTuPjetyLMJsVPHFYzAyK9bEiBO97FE8e1QoMXOy7Boqlit39Ws0Xgsb+d4jsqmkoc3F15HFF0tCq0VhoiiwXGBfznVj14u/Rqm7nzPvs2DlJS73YLOC5NN/ybTVj9Tg6Rq17dogNT7k9QmeaLnR65yTjuDouMD9L2Y0mzV0cnabAsFIQQg38F93w0rlcT9zpWCKh7TlObLwfqcJXVHK92nPYaWvTNFkKVCGVMBrPdsL3NwUuK8OfMfzxwDkTbPBHI9s7z8+2aWH4JS3XV8PQ04DkwKxdw24SUZrC8RXiOuPfu1ZAKwmx3WM6Sn1Xa/kFNO2y/HI3FnP1ozI/5/2fHgIrurSu7AkZ8A9BHhWyEjmOcbMvobNFsfjkV8d515cLwCAdRr3P2+iQ0ozyQNC/4ajblMz3dju0nzIdc/ARkD1BNRJ9VzkTpEczQB+Lavn0JACUdTAWXNn+8dKF3TLJYr/YLoJE3ouRCxZTWpiJHErfTd/1VllLlAvBdYxt0uYnCvMYUXDU7QgoqaufqrvGS11jkMGyzAmxeHXO2ZXMEHSg21+yxauUR4O59RWL7nDQ2bCBLprw+AdLbjJUhklFoQAAAABJRU5ErkJggg==",
+  "image_format": "png",
+  "prompt_type": "point",
+  "points": [
+    {
+      "x": 4,
+      "y": 4,
+      "label": 1
+    }
+  ],
+  "multimask_output": false,
+  "return_logits": false
+}

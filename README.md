@@ -32,8 +32,11 @@ stable-segmentation-service/
 │           ├── sam2_adapter.py      # SAM2 (Meta) — point/box prompts
 │           ├── clipseg_adapter.py   # CLIPSeg (HuggingFace) — text prompts
 │           └── registry.py          # Maps Backend enum → adapter class
-│       └── client/
-│           └── cli.py               # seg-client: backend-agnostic CLI client
+│       ├── client/
+│       │   └── cli.py               # seg-client: backend-agnostic CLI client
+│       └── eval/
+│           ├── correctness.py       # IoU, pixel agreement, coverage utilities
+│           └── direct_runners.py    # Direct (non-HTTP) adapter invocation helpers
 ├── tests/
 │   ├── conftest.py
 │   ├── test_health.py
@@ -44,16 +47,24 @@ stable-segmentation-service/
 │   ├── test_clipseg_adapter.py      # CLIPSeg adapter unit tests (mocked model)
 │   ├── test_clipseg_endpoint.py     # CLIPSeg HTTP-level tests (mocked model)
 │   ├── test_client.py               # CLI client unit tests (mocked HTTP)
-│   └── test_compatibility.py        # Cross-backend capability/behavior alignment
+│   ├── test_compatibility.py        # Cross-backend capability/behavior alignment
+│   └── test_eval_utils.py           # Unit tests for correctness comparison utilities
 ├── scripts/
-│   └── evaluate_compatibility.py    # Probe a live server; emit compatibility report
+│   ├── evaluate_compatibility.py    # Probe a live server; emit compatibility report
+│   └── evaluate_correctness.py      # Compare direct vs served outputs; emit report
+├── eval_assets/
+│   ├── images/                      # Reproducible 16×16 PNG test images (seed=42)
+│   └── requests/                    # Pre-built JSON request payloads
 ├── docs/
-│   ├── adapter-integration-notes.md # Per-adapter file change log
-│   ├── compatibility-matrix.md      # Expected + observed backend×prompt matrix
-│   └── client-stability-notes.md    # Which files must stay stable across swaps
+│   ├── adapter-integration-notes.md      # Per-adapter file change log
+│   ├── compatibility-matrix.md           # Expected + observed backend×prompt matrix
+│   ├── client-stability-notes.md         # Which files must stay stable across swaps
+│   ├── performance-evaluation-plan.md    # Direct-vs-served latency benchmark guide
+│   └── correctness-evaluation-plan.md    # Output correctness evaluation guide
 ├── benchmark/
 │   ├── latency.py                   # Serial latency measurements
-│   └── throughput.py                # Concurrent RPS measurement
+│   ├── throughput.py                # Concurrent RPS measurement
+│   └── direct_vs_served.py          # Direct vs HTTP service overhead comparison
 ├── .env.example
 ├── .gitignore
 └── pyproject.toml
@@ -428,6 +439,76 @@ Install benchmark extras if needed:
 
 ```bash
 pip install -e ".[benchmark]"
+```
+
+### Direct-vs-served overhead
+
+`benchmark/direct_vs_served.py` compares the latency of calling the adapter
+directly (no HTTP) against calling the served endpoint. This isolates the cost
+of the service layer (ASGI routing, JSON serialisation, TCP stack).
+
+```bash
+# Mock backend — no GPU required (start the service first)
+python benchmark/direct_vs_served.py --backend mock \
+    --url http://localhost:8000 --n 20
+
+# SAM2 backend
+python benchmark/direct_vs_served.py --backend sam2 \
+    --url http://localhost:8000 \
+    --sam2-checkpoint weights/sam2_hiera_large.pt \
+    --sam2-config sam2_hiera_l.yaml \
+    --n 10 --warmup 3
+
+# Export CSV
+python benchmark/direct_vs_served.py --backend mock \
+    --url http://localhost:8000 --n 20 --csv results.csv
+```
+
+See `docs/performance-evaluation-plan.md` for metrics, success criteria, and
+how to interpret results.
+
+---
+
+## Correctness evaluation
+
+`scripts/evaluate_correctness.py` checks that the service layer preserves model
+outputs exactly: the masks from a direct adapter call must be identical to those
+returned by the served endpoint (IoU = 1.0, pixel agreement = 1.0).
+
+```bash
+# Mock backend (no GPU required)
+python scripts/evaluate_correctness.py --backend mock \
+    --url http://localhost:8000
+
+# SAM2 backend
+python scripts/evaluate_correctness.py --backend sam2 \
+    --url http://localhost:8000 \
+    --sam2-checkpoint weights/sam2_hiera_large.pt \
+    --sam2-config sam2_hiera_l.yaml
+
+# CLIPSeg backend
+python scripts/evaluate_correctness.py --backend clipseg \
+    --url http://localhost:8000
+
+# Save Markdown report
+python scripts/evaluate_correctness.py --backend mock \
+    --url http://localhost:8000 --output report.md
+
+# CSV output
+python scripts/evaluate_correctness.py --backend mock \
+    --url http://localhost:8000 --format csv
+```
+
+The script exits `0` if all probes pass, `1` if any fail.
+
+See `docs/correctness-evaluation-plan.md` for metrics, pass/fail criteria, and
+report format details.
+
+Unit tests for the comparison utilities are in `tests/test_eval_utils.py` and
+run without a running server or GPU:
+
+```bash
+pytest tests/test_eval_utils.py -v
 ```
 
 ---
