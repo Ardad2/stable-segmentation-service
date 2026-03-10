@@ -29,7 +29,8 @@ stable-segmentation-service/
 │       └── adapters/
 │           ├── base.py              # BaseSegmentationAdapter (ABC)
 │           ├── mock_adapter.py      # Stub adapter — no GPU required
-│           ├── sam2_adapter.py      # SAM2 (Meta) backend
+│           ├── sam2_adapter.py      # SAM2 (Meta) — point/box prompts
+│           ├── clipseg_adapter.py   # CLIPSeg (HuggingFace) — text prompts
 │           └── registry.py          # Maps Backend enum → adapter class
 ├── tests/
 │   ├── conftest.py
@@ -37,7 +38,9 @@ stable-segmentation-service/
 │   ├── test_capabilities.py
 │   ├── test_segment.py
 │   ├── test_sam2_adapter.py         # SAM2 adapter unit tests (mocked predictor)
-│   └── test_sam2_endpoint.py        # SAM2 HTTP-level tests (mocked predictor)
+│   ├── test_sam2_endpoint.py        # SAM2 HTTP-level tests (mocked predictor)
+│   ├── test_clipseg_adapter.py      # CLIPSeg adapter unit tests (mocked model)
+│   └── test_clipseg_endpoint.py     # CLIPSeg HTTP-level tests (mocked model)
 ├── benchmark/
 │   ├── latency.py                   # Serial latency measurements
 │   └── throughput.py                # Concurrent RPS measurement
@@ -193,6 +196,79 @@ curl http://localhost:8000/api/v1/capabilities | python -m json.tool
 
 ---
 
+## CLIPSeg backend
+
+CLIPSeg is a text-guided segmentation model that complements SAM2: where SAM2
+requires geometric prompts (points / boxes), CLIPSeg accepts a free-text
+description of the region to segment.
+
+### Prerequisites
+
+1. **Install PyTorch** (version matching your CUDA toolkit if using GPU):
+   See [pytorch.org/get-started](https://pytorch.org/get-started/locally/) for
+   the correct install command for your platform.
+
+2. **Install the CLIPSeg extras** (transformers, numpy, Pillow, httpx):
+
+```bash
+pip install -e ".[clipseg]"
+```
+
+### Configuration
+
+Set the following environment variables (or add them to `.env`):
+
+```bash
+SEGMENTATION_BACKEND=clipseg
+CLIPSEG_MODEL=CIDAS/clipseg-rd64-refined   # HuggingFace model ID or local path
+MODEL_DEVICE=cpu                           # cpu | cuda | mps
+```
+
+The default model (`CIDAS/clipseg-rd64-refined`) is downloaded automatically
+from HuggingFace on the first request. To use a locally cached copy, set
+`CLIPSEG_MODEL` to the directory path where the model was saved.
+
+### Supported prompt types
+
+| `prompt_type` | Supported | Notes |
+|---------------|-----------|-------|
+| `text` | ✅ | Natural-language description of the region (e.g. `"the cat"`) |
+| `point` | ❌ | Not supported by CLIPSeg |
+| `box` | ❌ | Not supported by CLIPSeg |
+
+### Example request
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/segment \
+  -H "Content-Type: application/json" \
+  -d '{
+    "image": "<base64-encoded-png>",
+    "image_format": "png",
+    "prompt_type": "text",
+    "text_prompt": "the wooden chair"
+  }' | python -m json.tool
+```
+
+The response includes a single mask covering the region that best matches the
+text description, together with a confidence score (peak sigmoid activation).
+
+### Running with CLIPSeg
+
+```bash
+cp .env.example .env
+# Set SEGMENTATION_BACKEND=clipseg (and optionally CLIPSEG_MODEL) in .env
+
+uvicorn segmentation_service.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Verify the active backend:
+
+```bash
+curl http://localhost:8000/api/v1/capabilities | python -m json.tool
+```
+
+---
+
 ## Running tests
 
 ```bash
@@ -282,7 +358,8 @@ All settings can be set via environment variables or a `.env` file.
 |----------|---------|-------------|
 | `APP_ENV` | `development` | `development` / `staging` / `production` |
 | `LOG_LEVEL` | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
-| `SEGMENTATION_BACKEND` | `mock` | `mock` / `sam2` / `custom` |
+| `SEGMENTATION_BACKEND` | `mock` | `mock` / `sam2` / `clipseg` / `custom` |
 | `MODEL_DEVICE` | `cpu` | `cpu` / `cuda` / `mps` |
 | `SAM2_CHECKPOINT` | _(empty)_ | **Required for sam2.** Filesystem path to a SAM2 `.pt` weights file (e.g. `weights/sam2_hiera_large.pt`) |
 | `SAM2_CONFIG` | _(empty)_ | **Required for sam2.** SAM2 YAML config name without path prefix (e.g. `sam2_hiera_l.yaml`) |
+| `CLIPSEG_MODEL` | `CIDAS/clipseg-rd64-refined` | **Used by clipseg.** HuggingFace model ID or local path |
