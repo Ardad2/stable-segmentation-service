@@ -32,6 +32,8 @@ stable-segmentation-service/
 │           ├── sam2_adapter.py      # SAM2 (Meta) — point/box prompts
 │           ├── clipseg_adapter.py   # CLIPSeg (HuggingFace) — text prompts
 │           └── registry.py          # Maps Backend enum → adapter class
+│       └── client/
+│           └── cli.py               # seg-client: backend-agnostic CLI client
 ├── tests/
 │   ├── conftest.py
 │   ├── test_health.py
@@ -40,7 +42,15 @@ stable-segmentation-service/
 │   ├── test_sam2_adapter.py         # SAM2 adapter unit tests (mocked predictor)
 │   ├── test_sam2_endpoint.py        # SAM2 HTTP-level tests (mocked predictor)
 │   ├── test_clipseg_adapter.py      # CLIPSeg adapter unit tests (mocked model)
-│   └── test_clipseg_endpoint.py     # CLIPSeg HTTP-level tests (mocked model)
+│   ├── test_clipseg_endpoint.py     # CLIPSeg HTTP-level tests (mocked model)
+│   ├── test_client.py               # CLI client unit tests (mocked HTTP)
+│   └── test_compatibility.py        # Cross-backend capability/behavior alignment
+├── scripts/
+│   └── evaluate_compatibility.py    # Probe a live server; emit compatibility report
+├── docs/
+│   ├── adapter-integration-notes.md # Per-adapter file change log
+│   ├── compatibility-matrix.md      # Expected + observed backend×prompt matrix
+│   └── client-stability-notes.md    # Which files must stay stable across swaps
 ├── benchmark/
 │   ├── latency.py                   # Serial latency measurements
 │   └── throughput.py                # Concurrent RPS measurement
@@ -266,6 +276,127 @@ Verify the active backend:
 ```bash
 curl http://localhost:8000/api/v1/capabilities | python -m json.tool
 ```
+
+---
+
+## CLI client
+
+A small command-line client is included.  It calls `/api/v1/capabilities` first
+and selects the appropriate prompt type at runtime — the exact same invocation
+works unchanged with mock, SAM2, and CLIPSeg backends.
+
+### Installation
+
+```bash
+pip install -e ".[dev]"   # httpx is included in dev extras
+```
+
+`seg-client` is registered as a console entry point and is available immediately
+after installation.
+
+### Prompt selection
+
+The client picks the first compatible prompt in priority order: **text → point → box**.
+
+- If you supply `--text-prompt` and the backend supports `text`, a text request is sent.
+- If you supply `--point` and the backend supports `point`, a point request is sent.
+- If a supplied prompt is not supported, the client exits with a clear error message.
+- If no prompt is supplied, a harmless synthetic placeholder is chosen automatically (smoke-test mode).
+
+### Examples
+
+```bash
+# CLIPSeg backend — text prompt selected automatically
+seg-client --base-url http://localhost:8000 --image img.png --text-prompt "the cat"
+
+# SAM2 or mock backend — point prompt
+seg-client --base-url http://localhost:8000 --image img.png --point "320,240,1"
+
+# Supply both; client picks whichever the backend supports
+seg-client --base-url http://localhost:8000 --image img.png \
+    --text-prompt "the cat" --point "320,240,1"
+
+# Smoke-test mode (no image or prompt — uses synthetic defaults)
+seg-client --base-url http://localhost:8000
+
+# Save masks to disk
+seg-client --base-url http://localhost:8000 --image img.png \
+    --text-prompt "wooden chair" --output-dir ./out --return-logits
+
+# Full JSON response
+seg-client --base-url http://localhost:8000 --json
+```
+
+Sample output:
+
+```
+Backend:   clipseg
+Supported: text
+Prompt:    text — "the cat"
+Sending request…
+Masks:     1
+  [0] score=0.9300  area=18432 px
+Latency:   41.2 ms
+RequestID: a1b2c3d4-…
+```
+
+### All flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--base-url URL` | `http://localhost:8000` | Service base URL |
+| `--image PATH` | _(1×1 smoke PNG)_ | Image file to segment |
+| `--text-prompt TEXT` | _(none)_ | Natural-language prompt |
+| `--point X,Y,LABEL` | _(none)_ | Point prompt e.g. `"320,240,1"` |
+| `--box XMIN,YMIN,XMAX,YMAX` | _(none)_ | Box prompt |
+| `--output-dir DIR` | _(none)_ | Save masks as PNGs here |
+| `--return-logits` | false | Include raw logit maps |
+| `--json` | false | Print full JSON response |
+
+---
+
+## Compatibility evaluation
+
+### Automated tests (no server required)
+
+`tests/test_compatibility.py` proves pluggability in CI without a running server:
+
+```bash
+pytest tests/test_compatibility.py -v
+```
+
+Key invariants enforced for mock, SAM2, and CLIPSeg:
+- `/capabilities` accurately reflects what `/segment` accepts.
+- `/segment` accepts every prompt type listed in capabilities.
+- `/segment` returns 4xx/5xx for every prompt type NOT in capabilities.
+- `select_prompt()` adapts correctly to each backend's capabilities.
+- `SegmentResponse` schema is identical across all backends.
+
+### Live evaluation script
+
+`scripts/evaluate_compatibility.py` probes a **running** service and emits a
+Markdown or CSV report:
+
+```bash
+# Start the server (any backend)
+SEGMENTATION_BACKEND=mock uvicorn segmentation_service.main:app --port 8000
+
+# In another terminal:
+python scripts/evaluate_compatibility.py --url http://localhost:8000
+
+# CSV
+python scripts/evaluate_compatibility.py --url http://localhost:8000 --format csv
+
+# Save to file
+python scripts/evaluate_compatibility.py --url http://localhost:8000 \
+    --output docs/compatibility-matrix.md
+```
+
+The script probes all three prompt types and reports whether each observed
+result aligns with the backend's advertised capabilities.
+
+See `docs/compatibility-matrix.md` for the pre-seeded expected matrix and
+sample output for each backend.
 
 ---
 

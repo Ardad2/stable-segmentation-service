@@ -46,7 +46,8 @@ benchmark = [
 ]
 
 [project.scripts]
-serve = "segmentation_service.main:start"
+serve      = "segmentation_service.main:start"
+seg-client = "segmentation_service.client.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/segmentation_service"]
