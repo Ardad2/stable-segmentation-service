@@ -1,0 +1,7 @@
+{
+  "image": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAALUlEQVR4nGO8Y2PDgA0kLMAqzMCEXRg3GNVADGBJYFiAVWIBQwJ1bBjVQAwAADFOBHaEOTyvAAAAAElFTkSuQmCC",
+  "image_format": "png",
+  "prompt_type": "text",
+  "text_prompt": "red square",
+  "return_logits": false
+}

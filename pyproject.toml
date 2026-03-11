@@ -44,6 +44,11 @@ benchmark = [
     "rich>=13.7.0",
     "typer>=0.12.0",
 ]
+eval = [
+    "httpx>=0.27.0",
+    "numpy>=1.26.0",
+    "Pillow>=10.3.0",
+]
 
 [project.scripts]
 serve      = "segmentation_service.main:start"
@@ -65,3 +70,5 @@ serve = "uvicorn segmentation_service.main:app --reload --host 0.0.0.0 --port 80
 test  = "pytest"
 bench-latency    = "python benchmark/latency.py"
 bench-throughput = "python benchmark/throughput.py"
+bench-direct-vs-served = "python benchmark/direct_vs_served.py"
+eval-correctness = "python scripts/evaluate_correctness.py"
