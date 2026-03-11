@@ -75,3 +75,6 @@ class SegmentResponse(BaseModel):
     masks: list[MaskResult]
     latency_ms: float
     metadata: dict[str, Any] = Field(default_factory=dict)
+    # Additive v1 evolution: lets clients verify the API contract version.
+    # Old clients that ignore unknown fields are unaffected.
+    api_version: str = "1.0"
