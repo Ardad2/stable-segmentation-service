@@ -17,15 +17,21 @@ stable-segmentation-service/
 │       ├── logging_config.py        # Structured logging helpers
 │       ├── api/
 │       │   ├── router.py            # Mounts all versioned routers
-│       │   └── v1/
-│       │       ├── router.py        # Aggregates v1 endpoints
-│       │       ├── health.py        # GET  /api/v1/health
-│       │       ├── capabilities.py  # GET  /api/v1/capabilities
-│       │       └── segment.py       # POST /api/v1/segment
+│       │   ├── v1/
+│       │   │   ├── router.py        # Aggregates v1 endpoints
+│       │   │   ├── health.py        # GET  /api/v1/health
+│       │   │   ├── capabilities.py  # GET  /api/v1/capabilities
+│       │   │   └── segment.py       # POST /api/v1/segment
+│       │   └── v2/
+│       │       ├── router.py        # Aggregates v2 endpoints
+│       │       ├── health.py        # GET  /api/v2/health
+│       │       ├── capabilities.py  # GET  /api/v2/capabilities
+│       │       └── segment.py       # POST /api/v2/segment (breaking: prompt envelope)
 │       ├── schemas/
 │       │   ├── health.py            # HealthResponse
 │       │   ├── capabilities.py      # CapabilitiesResponse
-│       │   └── segment.py           # SegmentRequest / SegmentResponse / MaskResult
+│       │   ├── segment.py           # SegmentRequest / SegmentResponse / MaskResult (v1)
+│       │   └── v2segment.py         # V2SegmentRequest / V2SegmentResponse (v2)
 │       └── adapters/
 │           ├── base.py              # BaseSegmentationAdapter (ABC)
 │           ├── mock_adapter.py      # Stub adapter — no GPU required
@@ -48,10 +54,12 @@ stable-segmentation-service/
 │   ├── test_clipseg_endpoint.py     # CLIPSeg HTTP-level tests (mocked model)
 │   ├── test_client.py               # CLI client unit tests (mocked HTTP)
 │   ├── test_compatibility.py        # Cross-backend capability/behavior alignment
-│   └── test_eval_utils.py           # Unit tests for correctness comparison utilities
+│   ├── test_eval_utils.py           # Unit tests for correctness comparison utilities
+│   └── test_versioning.py           # API version × client/server compatibility matrix
 ├── scripts/
 │   ├── evaluate_compatibility.py    # Probe a live server; emit compatibility report
-│   └── evaluate_correctness.py      # Compare direct vs served outputs; emit report
+│   ├── evaluate_correctness.py      # Compare direct vs served outputs; emit report
+│   └── evaluate_versioning.py       # Client/server version-pair compatibility matrix
 ├── eval_assets/
 │   ├── images/                      # Reproducible 16×16 PNG test images (seed=42)
 │   └── requests/                    # Pre-built JSON request payloads
@@ -60,7 +68,8 @@ stable-segmentation-service/
 │   ├── compatibility-matrix.md           # Expected + observed backend×prompt matrix
 │   ├── client-stability-notes.md         # Which files must stay stable across swaps
 │   ├── performance-evaluation-plan.md    # Direct-vs-served latency benchmark guide
-│   └── correctness-evaluation-plan.md    # Output correctness evaluation guide
+│   ├── correctness-evaluation-plan.md    # Output correctness evaluation guide
+│   └── versioning-compatibility-plan.md  # API versioning experiment design + matrix
 ├── benchmark/
 │   ├── latency.py                   # Serial latency measurements
 │   ├── throughput.py                # Concurrent RPS measurement
@@ -120,13 +129,28 @@ Interactive docs are available at http://localhost:8000/docs (development mode o
 
 ## API endpoints
 
-All routes are prefixed with `/api/v1`.
+Two API versions co-exist under the same `/api` prefix.
+
+**v1 routes**
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET`  | `/api/v1/health` | Service liveness check |
 | `GET`  | `/api/v1/capabilities` | Active backend's supported features |
-| `POST` | `/api/v1/segment` | Run segmentation inference |
+| `POST` | `/api/v1/segment` | Run segmentation inference (flat prompt fields) |
+
+**v2 routes**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/v2/health` | Service liveness check |
+| `GET`  | `/api/v2/capabilities` | Active backend's supported features |
+| `POST` | `/api/v2/segment` | Run segmentation inference (nested prompt envelope) |
+
+All responses carry an `api_version` field (`"1.0"` or `"2.0"`).
+
+See the [API versioning section](#api-versioning) for the full compatibility
+matrix and an explanation of the breaking change.
 
 ### POST /api/v1/segment — example
 
@@ -408,6 +432,71 @@ result aligns with the backend's advertised capabilities.
 
 See `docs/compatibility-matrix.md` for the pre-seeded expected matrix and
 sample output for each backend.
+
+---
+
+## API versioning
+
+Two API major versions coexist.  The versioning experiment demonstrates:
+
+1. **Backward-compatible v1 evolution** — an additive `api_version` field was
+   added to all v1 response schemas.  Old clients that ignore unknown JSON keys
+   are unaffected.
+
+2. **Breaking v2 change** — `/api/v2/segment` replaces the five flat prompt
+   fields (`prompt_type`, `points`, `box`, `text_prompt`) with a single
+   required nested `prompt` envelope object.  Additionally, the per-mask field
+   `mask_b64` is renamed to `mask_data`.
+
+### API version vs model/backend version
+
+| Concept | Response field | Example |
+|---------|---------------|---------|
+| API contract | `api_version` | `"1.0"` / `"2.0"` |
+| Service code | `version` (health only) | `"0.1.0"` |
+| Active backend | `backend` | `"mock"` / `"sam2"` / `"clipseg"` |
+
+Swapping the backend does **not** change `api_version`.
+
+### v2 request format
+
+```bash
+# v1 — flat fields
+curl -s -X POST http://localhost:8000/api/v1/segment \
+  -H "Content-Type: application/json" \
+  -d '{"image":"...","prompt_type":"point","points":[{"x":10,"y":20,"label":1}]}'
+
+# v2 — nested prompt envelope (breaking change)
+curl -s -X POST http://localhost:8000/api/v2/segment \
+  -H "Content-Type: application/json" \
+  -d '{"image":"...","prompt":{"type":"point","points":[{"x":10,"y":20,"label":1}]}}'
+```
+
+A v1 payload sent to `/api/v2/segment` returns **HTTP 422** (missing `prompt`
+field).  A v2 payload sent to `/api/v1/segment` also returns **HTTP 422**
+(prompt_type='point' with no points — the `prompt` field is an unknown extra
+that Pydantic ignores).
+
+### Compatibility matrix (automated)
+
+```bash
+pytest tests/test_versioning.py -v
+```
+
+### Live versioning evaluation
+
+```bash
+# Start the service
+SEGMENTATION_BACKEND=mock uvicorn segmentation_service.main:app --port 8000
+
+python scripts/evaluate_versioning.py --url http://localhost:8000
+
+# CSV output
+python scripts/evaluate_versioning.py --url http://localhost:8000 --format csv
+```
+
+See `docs/versioning-compatibility-plan.md` for the full compatibility matrix,
+pass/fail criteria, and design rationale.
 
 ---
 
