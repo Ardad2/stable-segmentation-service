@@ -20,10 +20,9 @@ log = LogContext(get_logger(__name__))
 
 # 4×4 all-white PNG (smallest valid PNG, base64-encoded)
 _STUB_MASK_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAF0lEQVQI12P8"
-    "z8BQDwADhQGAWjR9awAAAABJRU5ErkJggg=="
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAAAAACMmsGiAAAAEUlEQVR4nGP8"
+    "z8DAwMSAQgAAE1EBB4BOjR4AAAAASUVORK5CYII="
 )
-
 
 class MockSegmentationAdapter(BaseSegmentationAdapter):
     """Deterministic stub — no GPU, no weights required."""
