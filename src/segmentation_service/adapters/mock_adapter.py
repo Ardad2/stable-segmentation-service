@@ -18,7 +18,7 @@ from segmentation_service.schemas.segment import MaskResult, SegmentRequest, Seg
 
 log = LogContext(get_logger(__name__))
 
-# 4×4 all-white PNG (smallest valid PNG, base64-encoded)
+# 4×4 all-white PNG (Pillow-decodable, base64-encoded)
 _STUB_MASK_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAAAAACMmsGiAAAAEUlEQVR4nGP8"
     "z8DAwMSAQgAAE1EBB4BOjR4AAAAASUVORK5CYII="
