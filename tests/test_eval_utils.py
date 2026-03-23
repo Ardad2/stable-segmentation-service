@@ -547,3 +547,30 @@ class TestValidateResponseMetadata:
         assert not checks["has_at_least_one_mask"]
         # No mask-level checks when masks absent
         assert "mask_has_score" not in checks
+
+
+# ---------------------------------------------------------------------------
+# Regression: mock adapter stub mask is Pillow-decodable
+# ---------------------------------------------------------------------------
+
+class TestMockStubMaskDecodable:
+    def test_stub_mask_b64_decodes_with_pillow(self):
+        """_STUB_MASK_B64 in mock_adapter must open cleanly with PIL.Image."""
+        import base64
+        import io
+        from PIL import Image
+        from segmentation_service.adapters.mock_adapter import _STUB_MASK_B64
+
+        raw = base64.b64decode(_STUB_MASK_B64)
+        img = Image.open(io.BytesIO(raw))
+        img.load()  # forces full decompression — catches broken data stream errors
+        assert img.size == (4, 4)
+
+    def test_stub_mask_b64_decodes_via_eval_utility(self):
+        """decode_mask_b64 must succeed on the mock stub and return a non-zero mask."""
+        from segmentation_service.adapters.mock_adapter import _STUB_MASK_B64
+        from segmentation_service.eval.correctness import decode_mask_b64
+
+        arr = decode_mask_b64(_STUB_MASK_B64)
+        assert arr.shape == (4, 4)
+        assert arr.any(), "stub mask should contain at least one foreground pixel"
