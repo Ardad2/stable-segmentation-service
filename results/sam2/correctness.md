@@ -1,15 +1,15 @@
 # Correctness Report — sam2
 
-Generated: 2026-03-26 00:49 UTC  |  URL: `http://127.0.0.1:8003`
+Generated: 2026-03-27 03:29 UTC  |  URL: `http://127.0.0.1:8003`
 
 ## Mask comparison
 
 | Prompt | Masks (D/S) | Dims match | Non-zero | IoU | Pixel agree | Coverage (D/S) | Result |
 |--------|:-----------:|:----------:|:--------:|:---:|:-----------:|:--------------:|:------:|
-| `point` | 1 / 1 | ✅ | ❌ | 1.000 | 1.000 | 0.00 / 0.00 | ❌ FAIL |
-| `box` | 1 / 1 | ✅ | ✅ | 1.000 | 1.000 | 1.00 / 1.00 | ✅ PASS |
+| `point` | 1 / 1 | ✅ | ✅ | 1.000 | 1.000 | 1.00 / 1.00 | ✅ PASS |
+| `box` | 1 / 1 | ✅ | ✅ | 1.000 | 1.000 | 0.30 / 0.30 | ✅ PASS |
 
-**Overall result: FAIL ❌**
+**Overall result: PASS ✅**
 
 ## Served response metadata
 

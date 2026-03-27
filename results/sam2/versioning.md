@@ -1,6 +1,6 @@
 # API Versioning Compatibility Matrix
 
-Generated: 2026-03-26 00:48 UTC  |  URL: `http://127.0.0.1:8003`  |  Backend: `sam2`
+Generated: 2026-03-27 03:29 UTC  |  URL: `http://127.0.0.1:8003`  |  Backend: `sam2`
 
 **8/8 rows passed**
 
