@@ -1,6 +1,6 @@
 # API Versioning Compatibility Matrix
 
-Generated: 2026-03-27 03:32 UTC  |  URL: `http://127.0.0.1:8004`  |  Backend: `clipseg`
+Generated: 2026-03-27 03:39 UTC  |  URL: `http://127.0.0.1:8004`  |  Backend: `clipseg`
 
 **2/8 rows passed**
 
