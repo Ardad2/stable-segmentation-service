@@ -38,41 +38,18 @@ import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
 
-# ---------------------------------------------------------------------------
-# Tiny synthetic image (1×1 PNG) used in all probe requests.
-# ---------------------------------------------------------------------------
-_PROBE_IMAGE = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
-    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-)
+# Allow running from any working directory.
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-# Probe payloads for each prompt type.
-_PROBE_PAYLOADS: dict[str, dict[str, Any]] = {
-    "point": {
-        "image": _PROBE_IMAGE,
-        "image_format": "png",
-        "prompt_type": "point",
-        "points": [{"x": 0, "y": 0, "label": 1}],
-    },
-    "box": {
-        "image": _PROBE_IMAGE,
-        "image_format": "png",
-        "prompt_type": "box",
-        "box": {"x_min": 0, "y_min": 0, "x_max": 1, "y_max": 1},
-    },
-    "text": {
-        "image": _PROBE_IMAGE,
-        "image_format": "png",
-        "prompt_type": "text",
-        "text_prompt": "object",
-    },
-}
+from segmentation_service.eval.probe_payloads import load_payload  # noqa: E402
 
-# Probe order (text first: most distinguishing across backends).
+# Probe order (covers all prompt types; unsupported ones are expected to fail).
 _PROBE_ORDER = ("point", "box", "text")
 
 
@@ -125,12 +102,19 @@ def _probe(
     base_url: str,
     prompt_type: str,
     timeout: float,
+    backend: str = "mock",
 ) -> tuple[int | None, float | None, int | None, str]:
     """Send a single /segment probe request.
 
+    Uses backend-specific payload from eval_assets/requests/ for sam2/clipseg so
+    that probes use representative images rather than a 1×1 stub.  For prompt
+    types without a dedicated asset file (e.g. sam2/text) the mock fallback is
+    used — the probe still exercises the validation path and is expected to fail
+    for unsupported types.
+
     Returns (http_status, latency_ms, masks_count, error_detail).
     """
-    payload = _PROBE_PAYLOADS[prompt_type]
+    payload = load_payload(backend, prompt_type)
     try:
         with httpx.Client(timeout=timeout) as client:
             t0 = time.perf_counter()
@@ -170,7 +154,7 @@ def run_evaluation(base_url: str, timeout: float = 30.0) -> list[ProbeResult]:
     results: list[ProbeResult] = []
     for pt in _PROBE_ORDER:
         claimed = pt in supported_types
-        status, latency, masks, error = _probe(base_url, pt, timeout)
+        status, latency, masks, error = _probe(base_url, pt, timeout, backend=backend)
         results.append(
             ProbeResult(
                 backend=backend,
