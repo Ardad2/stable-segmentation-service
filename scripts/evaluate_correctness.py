@@ -70,6 +70,10 @@ from segmentation_service.eval.correctness import (
     validate_response_metadata,
 )
 from segmentation_service.eval.direct_runners import DirectRunner
+from segmentation_service.eval.probe_payloads import (
+    BACKEND_PROBE_TYPES,
+    load_request,
+)
 from segmentation_service.schemas.segment import (
     BoxPrompt,
     PointPrompt,
@@ -80,6 +84,10 @@ from segmentation_service.schemas.segment import (
 # ---------------------------------------------------------------------------
 # Probe inputs per backend × prompt type
 # ---------------------------------------------------------------------------
+# mock uses tiny built-in synthetic payloads (no asset files needed).
+# sam2/clipseg load from eval_assets/requests/*.json so that probes use
+# backend-appropriate images and coordinate ranges rather than a 1×1 stub
+# that can produce unstable or degenerate model outputs.
 
 _STUB_IMAGE = (
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
@@ -105,23 +113,12 @@ _PROBE_REQUESTS: dict[str, dict[str, SegmentRequest]] = {
         ),
     },
     "sam2": {
-        "point": SegmentRequest(
-            image=_STUB_IMAGE, image_format="png",
-            prompt_type=PromptType.point,
-            points=[PointPrompt(x=0, y=0, label=1)],
-        ),
-        "box": SegmentRequest(
-            image=_STUB_IMAGE, image_format="png",
-            prompt_type=PromptType.box,
-            box=BoxPrompt(x_min=0, y_min=0, x_max=1, y_max=1),
-        ),
+        pt: load_request("sam2", pt)
+        for pt in BACKEND_PROBE_TYPES["sam2"]
     },
     "clipseg": {
-        "text": SegmentRequest(
-            image=_STUB_IMAGE, image_format="png",
-            prompt_type=PromptType.text,
-            text_prompt="object",
-        ),
+        pt: load_request("clipseg", pt)
+        for pt in BACKEND_PROBE_TYPES["clipseg"]
     },
 }
 
