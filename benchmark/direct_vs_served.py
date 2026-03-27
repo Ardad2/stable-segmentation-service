@@ -27,6 +27,12 @@ Usage
         --clipseg-model CIDAS/clipseg-rd64-refined \\
         --n 10 --warmup 3
 
+    # Supply an arbitrary payload from a JSON file
+    python benchmark/direct_vs_served.py --backend clipseg \\
+        --url http://localhost:8000 \\
+        --payload-file eval_assets/requests/clipseg_text.json \\
+        --n 10 --warmup 3
+
     # Export CSV for the final report
     python benchmark/direct_vs_served.py --backend mock \\
         --url http://localhost:8000 --n 20 --csv results.csv
@@ -60,56 +66,24 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from segmentation_service.eval.direct_runners import DirectRunner
-from segmentation_service.schemas.segment import (
-    BoxPrompt,
-    PointPrompt,
-    PromptType,
-    SegmentRequest,
-)
+from segmentation_service.eval.probe_payloads import load_request
+from segmentation_service.schemas.segment import SegmentRequest
 
 app = typer.Typer(add_completion=False)
 console = Console()
 
 # ---------------------------------------------------------------------------
-# Shared test inputs
+# Shared test inputs — loaded via probe_payloads so that sam2/clipseg use
+# backend-appropriate asset images rather than a 1×1 synthetic stub.
 # ---------------------------------------------------------------------------
 
-_STUB_IMAGE = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
-    "+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-)
-
 _REQUESTS: dict[str, SegmentRequest] = {
-    "mock-point": SegmentRequest(
-        image=_STUB_IMAGE,
-        image_format="png",
-        prompt_type=PromptType.point,
-        points=[PointPrompt(x=0, y=0, label=1)],
-    ),
-    "mock-text": SegmentRequest(
-        image=_STUB_IMAGE,
-        image_format="png",
-        prompt_type=PromptType.text,
-        text_prompt="object",
-    ),
-    "sam2-point": SegmentRequest(
-        image=_STUB_IMAGE,
-        image_format="png",
-        prompt_type=PromptType.point,
-        points=[PointPrompt(x=4, y=4, label=1)],
-    ),
-    "sam2-box": SegmentRequest(
-        image=_STUB_IMAGE,
-        image_format="png",
-        prompt_type=PromptType.box,
-        box=BoxPrompt(x_min=0, y_min=0, x_max=1, y_max=1),
-    ),
-    "clipseg-text": SegmentRequest(
-        image=_STUB_IMAGE,
-        image_format="png",
-        prompt_type=PromptType.text,
-        text_prompt="object",
-    ),
+    "mock-point":   load_request("mock",    "point"),
+    "mock-box":     load_request("mock",    "box"),
+    "mock-text":    load_request("mock",    "text"),
+    "sam2-point":   load_request("sam2",    "point"),
+    "sam2-box":     load_request("sam2",    "box"),
+    "clipseg-text": load_request("clipseg", "text"),
 }
 
 _BACKEND_DEFAULT_KEY = {
@@ -180,6 +154,7 @@ def main(  # noqa: C901
     n: Annotated[int, typer.Option(help="Measurement iterations (after warm-up)")] = 20,
     warmup: Annotated[int, typer.Option(help="Warm-up iterations (discarded)")] = 3,
     prompt_type: Annotated[str, typer.Option(help="Override prompt type: point | box | text")] = "",
+    payload_file: Annotated[str, typer.Option(help="Path to a JSON payload file (overrides built-in probe)")] = "",
     sam2_checkpoint: Annotated[str, typer.Option(help="SAM2 checkpoint path")] = "",
     sam2_config: Annotated[str, typer.Option(help="SAM2 config name")] = "",
     clipseg_model: Annotated[str, typer.Option(help="CLIPSeg model ID or path")] = "CIDAS/clipseg-rd64-refined",
@@ -191,22 +166,28 @@ def main(  # noqa: C901
     console.print(f"  served endpoint: {endpoint}")
 
     # ── 1. Build request ──────────────────────────────────────────────────
-    key = _BACKEND_DEFAULT_KEY.get(backend, "mock-point")
-    if prompt_type:
-        # Allow overriding the prompt type for the given backend.
-        overrides = {"mock": "mock", "sam2": "sam2", "clipseg": "clipseg"}
-        key = f"{overrides.get(backend, 'mock')}-{prompt_type}"
-    request = _REQUESTS.get(key)
-    if request is None:
-        console.print(f"[red]Unknown request key:[/red] {key!r}. Available: {list(_REQUESTS)}")
-        raise typer.Exit(1)
-    payload = request.model_dump(exclude_none=True)
-    # JSON-serialise enum values.
-    payload["prompt_type"] = request.prompt_type.value
-    if request.points:
-        payload["points"] = [p.model_dump() for p in request.points]
-    if request.box:
-        payload["box"] = request.box.model_dump()
+    if payload_file:
+        # Explicit file takes precedence over everything else.
+        payload = json.loads(Path(payload_file).read_text(encoding="utf-8"))
+        request = SegmentRequest.model_validate(payload)
+        key = f"{backend}-{request.prompt_type.value}"
+    else:
+        key = _BACKEND_DEFAULT_KEY.get(backend, "mock-point")
+        if prompt_type:
+            # Allow overriding the prompt type for the given backend.
+            overrides = {"mock": "mock", "sam2": "sam2", "clipseg": "clipseg"}
+            key = f"{overrides.get(backend, 'mock')}-{prompt_type}"
+        request = _REQUESTS.get(key)
+        if request is None:
+            console.print(f"[red]Unknown request key:[/red] {key!r}. Available: {list(_REQUESTS)}")
+            raise typer.Exit(1)
+        payload = request.model_dump(exclude_none=True)
+        # JSON-serialise enum values.
+        payload["prompt_type"] = request.prompt_type.value
+        if request.points:
+            payload["points"] = [p.model_dump() for p in request.points]
+        if request.box:
+            payload["box"] = request.box.model_dump()
 
     # ── 2. Build direct runner ────────────────────────────────────────────
     console.print(f"  Building direct runner for '{backend}'…")
