@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncIterator
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from segmentation_service import __version__
 from segmentation_service.api.router import root_router
 from segmentation_service.config import AppEnv, get_settings
 from segmentation_service.logging_config import LogContext, configure_logging, get_logger
+
+_WEB_DIR = Path(__file__).resolve().parent / "web"
 
 settings = get_settings()
 configure_logging(settings.log_level.value)
@@ -51,6 +55,9 @@ def create_app() -> FastAPI:
 
     # ---- routers ----
     app.include_router(root_router, prefix=settings.api_prefix)
+
+    # ---- demo UI — served at /demo (html=True serves index.html for /) ----
+    app.mount("/demo", StaticFiles(directory=str(_WEB_DIR), html=True), name="demo")
 
     return app
 
