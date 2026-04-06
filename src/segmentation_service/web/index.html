@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Segmentation Demo</title>
+  <link rel="stylesheet" href="/demo/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Segmentation Demo</h1>
+    <div id="status-bar">
+      <span id="backend-label">backend: —</span>
+      <span id="health-label">status: —</span>
+    </div>
+  </header>
+
+  <main>
+    <!-- Left: controls -->
+    <section id="controls">
+      <label class="block-label" for="image-input">1. Upload image</label>
+      <input id="image-input" type="file" accept="image/*" />
+
+      <label class="block-label">2. Prompt type</label>
+      <div id="prompt-type-group">
+        <label><input type="radio" name="prompt_type" value="text" checked /> Text</label>
+        <label><input type="radio" name="prompt_type" value="point" /> Point (click image)</label>
+        <label><input type="radio" name="prompt_type" value="box" /> Box (disabled)</label>
+      </div>
+
+      <div id="text-prompt-section">
+        <label class="block-label" for="text-prompt-input">Text prompt</label>
+        <input id="text-prompt-input" type="text" placeholder="e.g. cat, sky, person" />
+      </div>
+
+      <div id="point-prompt-section" class="hidden">
+        <p class="hint">Click on the image canvas to set a point.</p>
+        <p id="point-display">Point: none</p>
+      </div>
+
+      <button id="submit-btn" disabled>Run segmentation</button>
+      <p id="error-msg" class="error hidden"></p>
+    </section>
+
+    <!-- Right: canvas + result -->
+    <section id="canvas-area">
+      <div id="canvas-wrapper">
+        <canvas id="image-canvas"></canvas>
+        <canvas id="mask-canvas"></canvas>
+        <div id="canvas-placeholder">Upload an image to begin</div>
+      </div>
+
+      <div id="result-panel" class="hidden">
+        <h2>Result</h2>
+        <table id="result-table">
+          <tbody>
+            <tr><th>Backend</th><td id="res-backend">—</td></tr>
+            <tr><th>Latency</th><td id="res-latency">—</td></tr>
+            <tr><th>Masks returned</th><td id="res-masks">—</td></tr>
+            <tr><th>Top mask score</th><td id="res-score">—</td></tr>
+            <tr><th>Top mask area</th><td id="res-area">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/demo/app.js"></script>
+</body>
+</html>
