@@ -21,15 +21,60 @@ header {
 
 header h1 { font-size: 18px; font-weight: 600; }
 
-#status-bar { display: flex; gap: 16px; font-size: 12px; color: #aaa; }
+#status-bar {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #aaa;
+  align-items: center;
+}
+
 #status-bar span.ok { color: #6fcf97; }
 #status-bar span.err { color: #eb5757; }
+
+/* ---- Clickable health status ---- */
+.status-details {
+  position: relative;
+}
+
+.status-details > summary {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.status-details > summary::after {
+  content: "▾";
+  font-size: 10px;
+  color: #888;
+}
+
+#health-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: min(520px, 75vw);
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+  padding: 12px;
+}
 
 main {
   display: flex;
   flex: 1;
   gap: 16px;
   padding: 16px;
+  align-items: flex-start;
 }
 
 /* ---- Controls panel ---- */
@@ -62,6 +107,7 @@ input[type="file"] { font-size: 13px; }
   flex-direction: column;
   gap: 4px;
 }
+
 #prompt-type-group label { cursor: pointer; }
 
 input[type="text"] {
@@ -91,12 +137,13 @@ button#submit-btn:hover:not(:disabled) { background: #2d2d5e; }
 .error { color: #c0392b; font-size: 12px; }
 .hidden { display: none !important; }
 
-/* ---- Canvas area ---- */
+/* ---- Right column ---- */
 #canvas-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-width: 0;
 }
 
 #canvas-wrapper {
@@ -153,11 +200,11 @@ button#submit-btn:hover:not(:disabled) { background: #2d2d5e; }
 
 /* ---- API Details panel ---- */
 #api-details {
-  margin: 0 16px 16px;
   background: #fff;
   border: 1px solid #ddd;
   border-radius: 6px;
   overflow: hidden;
+  width: 100%;
 }
 
 #api-details > summary {
@@ -175,7 +222,6 @@ button#submit-btn:hover:not(:disabled) { background: #2d2d5e; }
   color: #333;
 }
 
-/* Custom disclosure triangle */
 #api-details > summary::-webkit-details-marker { display: none; }
 #api-details > summary::before {
   content: "▶";
@@ -235,6 +281,12 @@ pre.api-pre {
 }
 
 pre.api-pre.api-placeholder {
-  color: #666;
+  color: #999;
   font-style: italic;
+}
+
+@media (max-width: 1100px) {
+  #api-bodies {
+    grid-template-columns: 1fr;
+  }
 }

@@ -39,14 +39,13 @@ function truncateLongFields(val, key = null) {
 /**
  * Update the API Details panel.
  * @param {object} opts
- * @param {string}      opts.method        HTTP method (GET / POST)
- * @param {string}      opts.endpoint      Path, e.g. "/api/v1/segment"
- * @param {number|null} [opts.status]      HTTP status code, or null while pending
- * @param {object|null} [opts.requestBody] Payload sent (null for GET)
- * @param {object|null} [opts.responseBody] Parsed response (null while pending)
+ * @param {string}      opts.method
+ * @param {string}      opts.endpoint
+ * @param {number|null} [opts.status]
+ * @param {object|null} [opts.requestBody]
+ * @param {object|null} [opts.responseBody]
  */
 function setApiDetails({ method, endpoint, status = null, requestBody = null, responseBody = null }) {
-  // Activity line
   const activityEl = document.getElementById("api-activity");
   let activity = `${method}  ${endpoint}`;
   if (status !== null) {
@@ -58,7 +57,6 @@ function setApiDetails({ method, endpoint, status = null, requestBody = null, re
   }
   activityEl.textContent = activity;
 
-  // Request block
   const reqPre = document.getElementById("api-req-pre");
   if (requestBody === null) {
     reqPre.textContent = "(no request body)";
@@ -68,7 +66,6 @@ function setApiDetails({ method, endpoint, status = null, requestBody = null, re
     reqPre.classList.remove("api-placeholder");
   }
 
-  // Response block
   const resPre = document.getElementById("api-res-pre");
   if (responseBody === null) {
     resPre.textContent = "—";
@@ -78,8 +75,32 @@ function setApiDetails({ method, endpoint, status = null, requestBody = null, re
     resPre.classList.remove("api-placeholder");
   }
 
-  // Auto-expand on first real activity
   document.getElementById("api-details").open = true;
+}
+
+/**
+ * Update the health dropdown content in the header.
+ * @param {object} opts
+ * @param {number|null} [opts.status]
+ * @param {object|null} [opts.responseBody]
+ */
+function setHealthDetails({ status = null, responseBody = null }) {
+  const healthPre = document.getElementById("health-pre");
+  if (responseBody === null) {
+    healthPre.textContent = "—";
+    healthPre.classList.add("api-placeholder");
+  } else {
+    healthPre.textContent = JSON.stringify(truncateLongFields(responseBody), null, 2);
+    healthPre.classList.remove("api-placeholder");
+  }
+
+  const healthLabel = document.getElementById("health-label");
+  healthLabel.classList.remove("ok", "err");
+
+  if (status !== null) {
+    const ok = status >= 200 && status < 300;
+    healthLabel.classList.add(ok ? "ok" : "err");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -126,19 +147,38 @@ async function init() {
       const h = await healthRes.json();
       healthLabel.textContent = `status: ${h.status}`;
       healthLabel.classList.add("ok");
-      setApiDetails({ method: "GET", endpoint: "/api/v1/health", status: healthRes.status, requestBody: null, responseBody: h });
+      setHealthDetails({ status: healthRes.status, responseBody: h });
+      setApiDetails({
+        method: "GET",
+        endpoint: "/api/v1/health",
+        status: healthRes.status,
+        requestBody: null,
+        responseBody: h
+      });
     } else {
       healthLabel.textContent = "status: error";
       healthLabel.classList.add("err");
-      setApiDetails({ method: "GET", endpoint: "/api/v1/health", status: healthRes.status, requestBody: null, responseBody: null });
+      setHealthDetails({ status: healthRes.status, responseBody: { error: "health request failed" } });
+      setApiDetails({
+        method: "GET",
+        endpoint: "/api/v1/health",
+        status: healthRes.status,
+        requestBody: null,
+        responseBody: { error: "health request failed" }
+      });
     }
 
     if (capsRes.ok) {
       const c = await capsRes.json();
       backendLabel.textContent = `backend: ${c.backend}`;
-      setApiDetails({ method: "GET", endpoint: "/api/v1/capabilities", status: capsRes.status, requestBody: null, responseBody: c });
+      setApiDetails({
+        method: "GET",
+        endpoint: "/api/v1/capabilities",
+        status: capsRes.status,
+        requestBody: null,
+        responseBody: c
+      });
 
-      // Disable prompt types not supported by this backend.
       const supported = new Set(c.supported_prompt_types || []);
       for (const radio of document.querySelectorAll('input[name="prompt_type"]')) {
         if (!supported.has(radio.value)) {
@@ -147,7 +187,7 @@ async function init() {
           radio.parentElement.style.opacity = "0.4";
         }
       }
-      // Select first enabled radio automatically.
+
       const firstEnabled = document.querySelector('input[name="prompt_type"]:not(:disabled)');
       if (firstEnabled) {
         firstEnabled.checked = true;
@@ -157,7 +197,14 @@ async function init() {
   } catch (e) {
     healthLabel.textContent = "status: unreachable";
     healthLabel.classList.add("err");
-    setApiDetails({ method: "GET", endpoint: "/api/v1/health", status: null, requestBody: null, responseBody: { error: e.message } });
+    setHealthDetails({ status: null, responseBody: { error: e.message } });
+    setApiDetails({
+      method: "GET",
+      endpoint: "/api/v1/health",
+      status: null,
+      requestBody: null,
+      responseBody: { error: e.message }
+    });
   }
 }
 
@@ -175,10 +222,8 @@ imageInput.addEventListener("change", () => {
   const reader = new FileReader();
   reader.onload = (e) => {
     const dataUrl = e.target.result;
-    // Strip the data-url prefix to get bare base64.
     imageB64 = dataUrl.split(",")[1];
 
-    // Draw to canvas.
     const img = new Image();
     img.onload = () => {
       imageCanvas.width  = img.naturalWidth;
@@ -229,7 +274,6 @@ imageCanvas.addEventListener("click", (e) => {
   };
   pointDisplay.textContent = `Point: (${pointCoords.x}, ${pointCoords.y})`;
 
-  // Draw a small crosshair marker.
   clearMask();
   maskCtx.save();
   maskCtx.strokeStyle = "#ff4444";
@@ -276,8 +320,13 @@ async function runSegmentation() {
     payload.points = [{ x: pointCoords.x, y: pointCoords.y, label: 1 }];
   }
 
-  // Show the outgoing request immediately (pending, no response yet).
-  setApiDetails({ method: "POST", endpoint: "/api/v1/segment", status: null, requestBody: payload, responseBody: null });
+  setApiDetails({
+    method: "POST",
+    endpoint: "/api/v1/segment",
+    status: null,
+    requestBody: payload,
+    responseBody: null
+  });
 
   try {
     const res = await fetch("/api/v1/segment", {
@@ -287,7 +336,14 @@ async function runSegmentation() {
     });
 
     const data = await res.json();
-    setApiDetails({ method: "POST", endpoint: "/api/v1/segment", status: res.status, requestBody: payload, responseBody: data });
+
+    setApiDetails({
+      method: "POST",
+      endpoint: "/api/v1/segment",
+      status: res.status,
+      requestBody: payload,
+      responseBody: data
+    });
 
     if (!res.ok) {
       showError(`Server error ${res.status}: ${data.detail || JSON.stringify(data)}`);
@@ -297,7 +353,13 @@ async function runSegmentation() {
     displayResult(data);
   } catch (e) {
     showError(`Request failed: ${e.message}`);
-    setApiDetails({ method: "POST", endpoint: "/api/v1/segment", status: null, requestBody: payload, responseBody: { error: e.message } });
+    setApiDetails({
+      method: "POST",
+      endpoint: "/api/v1/segment",
+      status: null,
+      requestBody: payload,
+      responseBody: { error: e.message }
+    });
   } finally {
     submitBtn.textContent = "Run segmentation";
     updateSubmitState();
@@ -319,13 +381,11 @@ function displayResult(data) {
 
   if (masks.length === 0) return;
 
-  // Overlay the top mask (semi-transparent teal fill).
   const maskB64 = masks[0].mask_b64;
   if (!maskB64) return;
 
   const img = new Image();
   img.onload = () => {
-    // Draw mask into an offscreen canvas to read pixels.
     const off = document.createElement("canvas");
     off.width  = img.naturalWidth;
     off.height = img.naturalHeight;
@@ -335,7 +395,6 @@ function displayResult(data) {
     const src  = offCtx.getImageData(0, 0, off.width, off.height);
     const dest = maskCtx.createImageData(imageCanvas.width, imageCanvas.height);
 
-    // Scale mask to canvas if sizes differ.
     const sw = imageCanvas.width  / off.width;
     const sh = imageCanvas.height / off.height;
 
@@ -345,12 +404,11 @@ function displayResult(data) {
         const sy = Math.min(Math.floor(dy / sh), off.height - 1);
         const si = (sy * off.width + sx) * 4;
         const di = (dy * imageCanvas.width + dx) * 4;
-        // Non-black pixel → masked region.
         if (src.data[si] > 0 || src.data[si+1] > 0 || src.data[si+2] > 0) {
           dest.data[di]   = 0;
           dest.data[di+1] = 200;
           dest.data[di+2] = 180;
-          dest.data[di+3] = 110;  // ~43% opacity
+          dest.data[di+3] = 110;
         }
       }
     }

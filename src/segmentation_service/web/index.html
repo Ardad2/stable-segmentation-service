@@ -4,14 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Segmentation Demo</title>
-  <link rel="stylesheet" href="/demo/style.css?v=2" />
+  <link rel="stylesheet" href="/demo/style.css?v=3" />
 </head>
 <body>
   <header>
     <h1>Segmentation Demo</h1>
     <div id="status-bar">
       <span id="backend-label">backend: —</span>
-      <span id="health-label">status: —</span>
+
+      <details id="health-details" class="status-details">
+        <summary>
+          <span id="health-label">status: —</span>
+        </summary>
+        <div id="health-popover">
+          <span class="api-sub-label">GET /api/v1/health</span>
+          <pre id="health-pre" class="api-pre api-placeholder">—</pre>
+        </div>
+      </details>
     </div>
   </header>
 
@@ -42,7 +51,7 @@
       <p id="error-msg" class="error hidden"></p>
     </section>
 
-    <!-- Right: canvas + result -->
+    <!-- Right: canvas + result + API details -->
     <section id="canvas-area">
       <div id="canvas-wrapper">
         <canvas id="image-canvas"></canvas>
@@ -62,29 +71,31 @@
           </tbody>
         </table>
       </div>
+
+      <details id="api-details">
+        <summary>API Details</summary>
+        <div id="api-panel">
+          <div id="api-activity-row">
+            <span class="api-sub-label">Last API Activity</span>
+            <code id="api-activity">—</code>
+          </div>
+
+          <div id="api-bodies">
+            <div class="api-sub">
+              <span class="api-sub-label">Request JSON</span>
+              <pre id="api-req-pre" class="api-pre api-placeholder">(no request body)</pre>
+            </div>
+
+            <div class="api-sub">
+              <span class="api-sub-label">Response JSON</span>
+              <pre id="api-res-pre" class="api-pre api-placeholder">—</pre>
+            </div>
+          </div>
+        </div>
+      </details>
     </section>
   </main>
 
-  <details id="api-details">
-    <summary>API Details</summary>
-    <div id="api-panel">
-      <div id="api-activity-row">
-        <span class="api-sub-label">Last API Activity</span>
-        <code id="api-activity">—</code>
-      </div>
-      <div id="api-bodies">
-        <div class="api-sub">
-          <span class="api-sub-label">Request JSON</span>
-          <pre id="api-req-pre" class="api-pre api-placeholder">(no request body)</pre>
-        </div>
-        <div class="api-sub">
-          <span class="api-sub-label">Response JSON</span>
-          <pre id="api-res-pre" class="api-pre api-placeholder">—</pre>
-        </div>
-      </div>
-    </div>
-  </details>
-
-  <script src="/demo/app.js?v=2"></script>
+  <script src="/demo/app.js?v=3"></script>
 </body>
 </html>
