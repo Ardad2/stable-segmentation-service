@@ -1,6 +1,88 @@
 "use strict";
 
 // ---------------------------------------------------------------------------
+// API Details helpers
+// ---------------------------------------------------------------------------
+
+// Fields whose values are truncated for display (base64 blobs).
+const _BLOB_FIELDS = new Set(["image", "mask_b64", "mask_data", "logits_b64"]);
+
+/**
+ * Return a deep copy of `val` with long strings shortened for display.
+ * Only shortens known blob fields OR any string > 200 chars.
+ * Never mutates the original.
+ */
+function truncateLongFields(val, key = null) {
+  if (typeof val === "string") {
+    const isBlobField = key !== null && _BLOB_FIELDS.has(key);
+    if (isBlobField || val.length > 200) {
+      const keep = 80;
+      if (val.length > keep) {
+        return val.slice(0, keep) + `…[${val.length} chars]`;
+      }
+    }
+    return val;
+  }
+  if (Array.isArray(val)) {
+    return val.map((item) => truncateLongFields(item));
+  }
+  if (val !== null && typeof val === "object") {
+    const out = {};
+    for (const [k, v] of Object.entries(val)) {
+      out[k] = truncateLongFields(v, k);
+    }
+    return out;
+  }
+  return val;
+}
+
+/**
+ * Update the API Details panel.
+ * @param {object} opts
+ * @param {string}      opts.method        HTTP method (GET / POST)
+ * @param {string}      opts.endpoint      Path, e.g. "/api/v1/segment"
+ * @param {number|null} [opts.status]      HTTP status code, or null while pending
+ * @param {object|null} [opts.requestBody] Payload sent (null for GET)
+ * @param {object|null} [opts.responseBody] Parsed response (null while pending)
+ */
+function setApiDetails({ method, endpoint, status = null, requestBody = null, responseBody = null }) {
+  // Activity line
+  const activityEl = document.getElementById("api-activity");
+  let activity = `${method}  ${endpoint}`;
+  if (status !== null) {
+    const ok = status >= 200 && status < 300;
+    activity += `  →  ${status}`;
+    activityEl.className = ok ? "api-status-ok" : "api-status-err";
+  } else {
+    activityEl.className = "api-status-pending";
+  }
+  activityEl.textContent = activity;
+
+  // Request block
+  const reqPre = document.getElementById("api-req-pre");
+  if (requestBody === null) {
+    reqPre.textContent = "(no request body)";
+    reqPre.classList.add("api-placeholder");
+  } else {
+    reqPre.textContent = JSON.stringify(truncateLongFields(requestBody), null, 2);
+    reqPre.classList.remove("api-placeholder");
+  }
+
+  // Response block
+  const resPre = document.getElementById("api-res-pre");
+  if (responseBody === null) {
+    resPre.textContent = "—";
+    resPre.classList.add("api-placeholder");
+  } else {
+    resPre.textContent = JSON.stringify(truncateLongFields(responseBody), null, 2);
+    resPre.classList.remove("api-placeholder");
+  }
+
+  // Auto-expand on first real activity
+  document.getElementById("api-details").open = true;
+}
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
@@ -44,14 +126,17 @@ async function init() {
       const h = await healthRes.json();
       healthLabel.textContent = `status: ${h.status}`;
       healthLabel.classList.add("ok");
+      setApiDetails({ method: "GET", endpoint: "/api/v1/health", status: healthRes.status, requestBody: null, responseBody: h });
     } else {
       healthLabel.textContent = "status: error";
       healthLabel.classList.add("err");
+      setApiDetails({ method: "GET", endpoint: "/api/v1/health", status: healthRes.status, requestBody: null, responseBody: null });
     }
 
     if (capsRes.ok) {
       const c = await capsRes.json();
       backendLabel.textContent = `backend: ${c.backend}`;
+      setApiDetails({ method: "GET", endpoint: "/api/v1/capabilities", status: capsRes.status, requestBody: null, responseBody: c });
 
       // Disable prompt types not supported by this backend.
       const supported = new Set(c.supported_prompt_types || []);
@@ -72,6 +157,7 @@ async function init() {
   } catch (e) {
     healthLabel.textContent = "status: unreachable";
     healthLabel.classList.add("err");
+    setApiDetails({ method: "GET", endpoint: "/api/v1/health", status: null, requestBody: null, responseBody: { error: e.message } });
   }
 }
 
@@ -190,6 +276,9 @@ async function runSegmentation() {
     payload.points = [{ x: pointCoords.x, y: pointCoords.y, label: 1 }];
   }
 
+  // Show the outgoing request immediately (pending, no response yet).
+  setApiDetails({ method: "POST", endpoint: "/api/v1/segment", status: null, requestBody: payload, responseBody: null });
+
   try {
     const res = await fetch("/api/v1/segment", {
       method: "POST",
@@ -198,6 +287,7 @@ async function runSegmentation() {
     });
 
     const data = await res.json();
+    setApiDetails({ method: "POST", endpoint: "/api/v1/segment", status: res.status, requestBody: payload, responseBody: data });
 
     if (!res.ok) {
       showError(`Server error ${res.status}: ${data.detail || JSON.stringify(data)}`);
@@ -207,6 +297,7 @@ async function runSegmentation() {
     displayResult(data);
   } catch (e) {
     showError(`Request failed: ${e.message}`);
+    setApiDetails({ method: "POST", endpoint: "/api/v1/segment", status: null, requestBody: payload, responseBody: { error: e.message } });
   } finally {
     submitBtn.textContent = "Run segmentation";
     updateSubmitState();

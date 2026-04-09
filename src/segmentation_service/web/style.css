@@ -150,3 +150,91 @@ button#submit-btn:hover:not(:disabled) { background: #2d2d5e; }
   font-size: 13px;
 }
 #result-table th { width: 140px; color: #666; font-weight: 500; }
+
+/* ---- API Details panel ---- */
+#api-details {
+  margin: 0 16px 16px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+#api-details > summary {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  background: #f8f8f8;
+  border-bottom: 1px solid #eee;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+}
+
+/* Custom disclosure triangle */
+#api-details > summary::-webkit-details-marker { display: none; }
+#api-details > summary::before {
+  content: "▶";
+  font-size: 9px;
+  color: #888;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+#api-details[open] > summary::before { transform: rotate(90deg); }
+
+#api-panel { padding: 12px 16px 16px; }
+
+#api-activity-row {
+  margin-bottom: 12px;
+}
+
+#api-activity {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.api-status-ok      { color: #27ae60; }
+.api-status-err     { color: #c0392b; }
+.api-status-pending { color: #888; }
+
+#api-bodies {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.api-sub-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+pre.api-pre {
+  background: #1a1a2e;
+  color: #d4d4d4;
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 260px;
+  white-space: pre;
+  tab-size: 2;
+  margin: 0;
+}
+
+pre.api-pre.api-placeholder {
+  color: #666;
+  font-style: italic;
+}
